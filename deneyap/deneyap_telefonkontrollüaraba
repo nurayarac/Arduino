@@ -1,0 +1,110 @@
+#include <WiFi.h>
+
+int IN4 = D0;
+int IN3 = D1;
+int IN1 = D12;
+int IN2 = D13;
+int ENApin = D8;
+int ENBpin = D14;
+
+const char *ssid = "ESP32_Car";
+const char *password = "87654321";
+
+WiFiServer server(80);
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(IN4, OUTPUT);
+  pinMode(IN3, OUTPUT);
+  pinMode(IN1, OUTPUT);
+  pinMode(IN2, OUTPUT);
+  pinMode(ENApin, OUTPUT);
+  pinMode(ENBpin, OUTPUT);
+
+  WiFi.softAP(ssid, password);
+  Serial.println("Wi-Fi Ağı Oluşturuldu!");
+  Serial.print("ESP32 IP Adresi: ");
+  Serial.println(WiFi.softAPIP());
+
+  server.begin();
+}
+
+void hareket(int sag, int sag_geri, int sol, int sol_geri, int hiz) {
+  digitalWrite(IN4, sag);
+  digitalWrite(IN3, sag_geri);
+  digitalWrite(IN1, sol);
+  digitalWrite(IN2, sol_geri);
+  analogWrite(ENApin, hiz);
+  analogWrite(ENBpin, hiz);
+}
+
+void loop() {
+  WiFiClient client = server.available();
+  
+  if (client) {
+    String request = client.readStringUntil('\r');
+    Serial.println(request);
+    client.flush();
+
+    
+    if (request.indexOf("/forward") != -1) {
+      Serial.println("🚗 İleri gidiyor!");
+      hareket(HIGH, LOW, HIGH, LOW, 150);
+    } 
+    else if (request.indexOf("/back") != -1) {
+      Serial.println("⬅ Geri gidiyor!");
+      hareket(LOW, HIGH, LOW, HIGH, 150);
+    } 
+    else if (request.indexOf("/left") != -1) {
+      Serial.println("⬅ Sola dönüyor!");
+      hareket(LOW, HIGH, HIGH, LOW, 150);
+    } 
+    else if (request.indexOf("/right") != -1) {
+      Serial.println("➡ Sağa dönüyor!");
+      hareket(HIGH, LOW, LOW, HIGH, 150);
+    } 
+    else if (request.indexOf("/stop") != -1) {
+      Serial.println("⏹ Durduruluyor!");
+      hareket(LOW, LOW, LOW, LOW, 0);
+    }
+
+client.println("HTTP/1.1 200 OK");
+client.println("Content-Type: text/html");
+client.println();
+client.println("<html><head>");
+client.println("<meta charset=\"UTF-8\">");
+client.println("<title>ESP32 Araç Kontrol</title>");
+client.println("<style>");
+client.println("body { font-family: Arial, sans-serif; background-color: #f0f0f0; display: flex; justify-content: flex-start; align-items: center; height: 100vh; padding-left: 20px; }");
+client.println(".container { display: grid; grid-template-columns: 100px 100px 100px; grid-template-rows: 100px 100px 100px; gap: 10px; align-items: center; justify-content: flex-start; }");
+client.println(".button { font-size: 24px; padding: 20px; background-color: #4CAF50; color: white; border: none; border-radius: 8px; cursor: pointer; }");
+client.println(".button:hover { background-color: #45a049; }");
+client.println(".button:focus { outline: none; }");
+client.println(".up { grid-column: 2; grid-row: 1; }");
+client.println(".left { grid-column: 1; grid-row: 2; }");
+client.println(".stop { grid-column: 2; grid-row: 2; background-color: red; }");
+client.println(".right { grid-column: 3; grid-row: 2; }");
+client.println(".down { grid-column: 2; grid-row: 3; }");
+client.println("</style>");
+client.println("<script>");
+client.println("function sendCommand(command) { fetch(command); }");
+
+client.println("document.addEventListener('contextmenu', function (event) { event.preventDefault(); });");
+
+client.println("document.addEventListener('selectstart', function (event) { event.preventDefault(); });");
+
+client.println("</script>");
+client.println("</head><body>");
+client.println("<div class='container'>");
+client.println("<button class='button up' ontouchstart=\"sendCommand('/forward')\" ontouchend=\"sendCommand('/stop')\" onmousedown=\"sendCommand('/forward')\" onmouseup=\"sendCommand('/stop')\">⬆️</button>");
+client.println("<button class='button left' ontouchstart=\"sendCommand('/left')\" ontouchend=\"sendCommand('/stop')\" onmousedown=\"sendCommand('/left')\" onmouseup=\"sendCommand('/stop')\">⬅️</button>");
+client.println("<button class='button stop' onclick=\"sendCommand('/stop')\">⏹️</button>");
+client.println("<button class='button right' ontouchstart=\"sendCommand('/right')\" ontouchend=\"sendCommand('/stop')\" onmousedown=\"sendCommand('/right')\" onmouseup=\"sendCommand('/stop')\">➡️</button>");
+client.println("<button class='button down' ontouchstart=\"sendCommand('/back')\" ontouchend=\"sendCommand('/stop')\" onmousedown=\"sendCommand('/back')\" onmouseup=\"sendCommand('/stop')\">⬇️</button>");
+client.println("</div>");
+client.println("</body></html>");
+client.stop();
+
+    
+  }
+}
